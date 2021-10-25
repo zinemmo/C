@@ -1,0 +1,19 @@
+sudo: false
+language: c
+compiler:
+  - gcc
+addons:
+  apt:
+    sources:
+      - ubuntu-toolchain-r-test
+    packages:
+      - gcc
+before_install:
+  - sudo apt update
+  - sudo apt-get install lcov
+  - sudo apt-get install cppcheck
+  - sudo apt-get install valgrind
+install:
+  - "[ $GCC = gcc ] && export GCC=gcc || true"
+script:
+  - make run

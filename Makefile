@@ -1,8 +1,8 @@
 #ARCH = avr/atmega328p
 #ARCH = avr/atmega2560
 #ARCH = mips/hf-risc
-#ARCH = riscv/hf-riscv
-ARCH = riscv/hf-riscv-e
+ARCH = riscv/hf-riscv
+#ARCH = riscv/hf-riscv-e
 #ARCH = riscv/hf-riscv-llvm
 #ARCH = riscv/riscv32-qemu
 #ARCH = riscv/riscv32-qemu-llvm
@@ -76,6 +76,10 @@ hello: hal ucx
 
 hello_p: hal ucx
 	$(CC) $(CFLAGS) -o hello_preempt.o app/hello_preempt.c
+	@$(MAKE) --no-print-directory link
+
+edf: hal ucx
+	$(CC) $(CFLAGS) -o edf.o app/edf.c
 	@$(MAKE) --no-print-directory link
 
 mutex: hal ucx

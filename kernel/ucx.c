@@ -100,6 +100,35 @@ int32_t ucx_task_add(void *task, uint16_t guard_size)
 	kcb_p->tcb_p->id = kcb_p->id++;
 	kcb_p->tcb_p->state = TASK_STOPPED;
 	kcb_p->tcb_p->priority = TASK_NORMAL_PRIO;
+	kcb_p->tcb_p->isPeriodic = false;
+	
+	return 0;
+}
+
+int32_t ucx_task_add_periodic(void *task, uint16_t period, uint16_t capacity, uint16_t deadline, uint16_t guard_size)
+{
+	struct tcb_s *tcb_last = kcb_p->tcb_p;
+	
+	kcb_p->tcb_p = (struct tcb_s *)malloc(sizeof(struct tcb_s));
+	if (kcb_p->tcb_first == 0)
+		kcb_p->tcb_first = kcb_p->tcb_p;
+
+	if (!kcb_p->tcb_p)
+		return -1;
+
+	if (tcb_last)
+		tcb_last->tcb_next = kcb_p->tcb_p;
+	kcb_p->tcb_p->tcb_next = kcb_p->tcb_first;
+	kcb_p->tcb_p->task = task;
+	kcb_p->tcb_p->delay = 0;
+	kcb_p->tcb_p->guard_sz = guard_size;
+	kcb_p->tcb_p->id = kcb_p->id++;
+	kcb_p->tcb_p->state = TASK_STOPPED;
+	kcb_p->tcb_p->priority = TASK_NORMAL_PRIO;
+	kcb_p->tcb_p->period = period;
+	kcb_p->tcb_p->capacity = capacity;
+	kcb_p->tcb_p->deadline = deadline;
+	kcb_p->tcb_p->isPeriodic = true;
 	
 	return 0;
 }

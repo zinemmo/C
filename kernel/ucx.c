@@ -66,12 +66,32 @@ uint16_t krnl_schedule(void)
 	return kcb_p->tcb_p->id;
 }
 
+uint16_t krnl_schedule_edf(void)
+{
+	if (kcb_p->tcb_p->state == TASK_RUNNING)
+		kcb_p->tcb_p->state = TASK_READY;
+	do {
+		do {
+			kcb_p->tcb_p = kcb_p->tcb_p->tcb_next;
+		} while (kcb_p->tcb_p->state != TASK_READY);
+	} while (--kcb_p->tcb_p->priority & 0xff);
+	kcb_p->tcb_p->priority |= (kcb_p->tcb_p->priority >> 8) & 0xff;
+	kcb_p->tcb_p->state = TASK_RUNNING;
+	kcb_p->ctx_switches++;
+	
+	return kcb_p->tcb_p->id;
+}
+
 void krnl_dispatcher(void)
 {
 	if (!setjmp(kcb_p->tcb_p->context)) {
 		krnl_delay_update();
 		krnl_guard_check();
-		krnl_schedule();
+		int id = krnl_schedule_edf();
+		if(id < 0) {
+			krnl_schedule();
+		}
+		// krnl_schedule();
 		_interrupt_tick();
 		longjmp(kcb_p->tcb_p->context, 1);
 	}
@@ -128,7 +148,8 @@ int32_t ucx_task_add_periodic(void *task, uint16_t period, uint16_t capacity, ui
 	kcb_p->tcb_p->period = period;
 	kcb_p->tcb_p->capacity = capacity;
 	kcb_p->tcb_p->deadline = deadline;
-	kcb_p->tcb_p->isPeriodic = true;
+	kcb_p->tcb_p->isStr = true;
+	kcb_p->tcb_p->deadlineCounter = deadline;
 	
 	return 0;
 }

@@ -30,10 +30,11 @@ struct tcb_s {
 	uint16_t delay;
 	uint16_t priority;
 	uint8_t state;
-	bool isPeriodic;
+	bool isStr;
 	uint16_t capacity;
 	uint16_t deadline;
 	uint16_t period;
+	uint16_t deadlineCounter;
 };
 
 /* kernel control block */

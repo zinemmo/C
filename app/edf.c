@@ -2,51 +2,38 @@
 
 void task2(void)
 {
-	int32_t cnt = 300000;
-	
 	ucx_task_init();
 
 	while (1) {
-		printf("[task 2 %ld]\n", cnt++);
-		ucx_task_yield();
+		printf("");
 	}
 }
 
 void task1(void)
 {
-	int32_t cnt = 200000;
-
 	ucx_task_init();
 
 	while (1) {
-		printf("[task 1 %ld]\n", cnt++);
-		ucx_task_yield();
+		printf("");
 	}
 }
 
 void task0(void)
 {
-	int32_t cnt = 100000;
-
 	ucx_task_init();
 
 	while (1) {
-		printf("[task 0 %ld]\n", cnt++);
-		ucx_task_yield();
+		printf("");
 	}
 }
 
-
 int32_t app_main(void)
 {
-	ucx_task_add(task0, DEFAULT_GUARD_SIZE);
-	ucx_task_add(task1, DEFAULT_GUARD_SIZE);
-	ucx_task_add_periodic(task2, 4, 1, 4, DEFAULT_GUARD_SIZE);
-	
-	ucx_task_priority(1, TASK_HIGH_PRIO);
+	ucx_task_add_periodic(task1, 2, 15, 12, DEFAULT_GUARD_SIZE);
+	ucx_task_add_periodic(task2, 3, 10, 9, DEFAULT_GUARD_SIZE);
+	ucx_task_add_periodic(task0, 5, 15, 8, DEFAULT_GUARD_SIZE);
 
-	printf("hello world!\n");
-
-	// start UCX/OS, cooperative mode
-	return 0;
+	// A última task está sendo executada primeiro
+	// start UCX/OS, preemptive mode
+	return 1;
 }

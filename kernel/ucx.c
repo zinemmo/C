@@ -8,6 +8,7 @@
 
 struct kcb_s kernel_state;
 struct kcb_s *kcb_p = &kernel_state;
+int clockCounter = 1;
 
 /* kernel auxiliary functions */
 
@@ -66,20 +67,60 @@ uint16_t krnl_schedule(void)
 	return kcb_p->tcb_p->id;
 }
 
-uint16_t krnl_schedule_edf(void)
+int16_t krnl_schedule_edf(void)
 {
-	if (kcb_p->tcb_p->state == TASK_RUNNING)
+	printf("------ %d ------\n", clockCounter);
+	struct tcb_s *tcb_aux;
+	tcb_aux->deadlineCounter = __INT16_MAX__;
+
+	// Duvida se temos que rodar pra sempre ou só dentro do MMC
+	// Se for pra sempre, como controlamos o reinício das tasks periódicas;
+
+	// Diminuir um no contador de Deadline de todas as taks periodicas
+	
+	// Diminuir um do contador de capacidade da tarefa que está executando
+	if (kcb_p->tcb_p->state == TASK_RUNNING) {
+		clockCounter++;
+		printf("Task Running %d\n", kcb_p->tcb_p->id);
+		if(kcb_p->tcb_p->capacityCounter > 0) {
+			kcb_p->tcb_p->capacityCounter--;
+			printf("Capacity of running task %d\n", kcb_p->tcb_p->capacityCounter);
+		}
+		
+		// Reseta a tarefa com capacidade zerada e em um novo período
+		// if(kcb_p->tcb_p->capacityCounter == 0) {
+
+		// }
+
 		kcb_p->tcb_p->state = TASK_READY;
+	}
+
 	do {
-		do {
-			kcb_p->tcb_p = kcb_p->tcb_p->tcb_next;
-		} while (kcb_p->tcb_p->state != TASK_READY);
-	} while (--kcb_p->tcb_p->priority & 0xff);
+		if(kcb_p->tcb_p->isStr) {
+			kcb_p->tcb_p->deadlineCounter--; 
+			if(kcb_p->tcb_p->deadlineCounter < tcb_aux->deadlineCounter && kcb_p->tcb_p->capacityCounter > 0) {
+				tcb_aux = kcb_p->tcb_p;
+			}
+		}
+		printf("CC - %u DC - %u P %u - ID %u\n", kcb_p->tcb_p->capacityCounter, kcb_p->tcb_p->deadlineCounter, kcb_p->tcb_p->period, kcb_p->tcb_p->id);
+		kcb_p->tcb_p = kcb_p->tcb_p->tcb_next;
+	} while (kcb_p->tcb_p->tcb_next != kcb_p->tcb_first);
+	printf("Task EDF scheduled %d - %d\n", tcb_aux->id, tcb_aux);
+	if(tcb_aux->deadlineCounter == __INT16_MAX__) {
+		return -1;
+	}
+
+	kcb_p->tcb_p = tcb_aux;
 	kcb_p->tcb_p->priority |= (kcb_p->tcb_p->priority >> 8) & 0xff;
 	kcb_p->tcb_p->state = TASK_RUNNING;
 	kcb_p->ctx_switches++;
 	
-	return kcb_p->tcb_p->id;
+
+	if(kcb_p->tcb_p->isStr) {
+		return kcb_p->tcb_p->id;
+	}
+
+	return -1;
 }
 
 void krnl_dispatcher(void)
@@ -91,7 +132,6 @@ void krnl_dispatcher(void)
 		if(id < 0) {
 			krnl_schedule();
 		}
-		// krnl_schedule();
 		_interrupt_tick();
 		longjmp(kcb_p->tcb_p->context, 1);
 	}
@@ -120,12 +160,12 @@ int32_t ucx_task_add(void *task, uint16_t guard_size)
 	kcb_p->tcb_p->id = kcb_p->id++;
 	kcb_p->tcb_p->state = TASK_STOPPED;
 	kcb_p->tcb_p->priority = TASK_NORMAL_PRIO;
-	kcb_p->tcb_p->isPeriodic = false;
+	kcb_p->tcb_p->isStr = false;
 	
 	return 0;
 }
 
-int32_t ucx_task_add_periodic(void *task, uint16_t period, uint16_t capacity, uint16_t deadline, uint16_t guard_size)
+int32_t ucx_task_add_periodic(void *task, uint16_t capacity, uint16_t period, uint16_t deadline, uint16_t guard_size)
 {
 	struct tcb_s *tcb_last = kcb_p->tcb_p;
 	
@@ -150,6 +190,7 @@ int32_t ucx_task_add_periodic(void *task, uint16_t period, uint16_t capacity, ui
 	kcb_p->tcb_p->deadline = deadline;
 	kcb_p->tcb_p->isStr = true;
 	kcb_p->tcb_p->deadlineCounter = deadline;
+	kcb_p->tcb_p->capacityCounter = capacity;
 	
 	return 0;
 }

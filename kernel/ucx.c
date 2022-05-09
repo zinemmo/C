@@ -53,8 +53,11 @@ static void krnl_sched_init(int32_t preemptive)
 
 uint16_t krnl_schedule(void)
 {
-	if (kcb_p->tcb_p->state == TASK_RUNNING)
+	if (kcb_p->tcb_p->state == TASK_RUNNING) {
+		printf("Task Running %d\n", kcb_p->tcb_p->id);
 		kcb_p->tcb_p->state = TASK_READY;
+	}
+
 	do {
 		do {
 			kcb_p->tcb_p = kcb_p->tcb_p->tcb_next;
@@ -69,30 +72,24 @@ uint16_t krnl_schedule(void)
 
 int16_t krnl_schedule_edf(void)
 {
-	printf("------ %d ------\n", clockCounter);
 	struct tcb_s *tcb_aux;
 	tcb_aux->deadlineCounter = __INT16_MAX__;
-
+	int currentRunningTaskId;
+	bool cycledThroughList = false;
 	// Duvida se temos que rodar pra sempre ou só dentro do MMC
 	// Se for pra sempre, como controlamos o reinício das tasks periódicas;
 
-	// Diminuir um no contador de Deadline de todas as taks periodicas
-	
-	// Diminuir um do contador de capacidade da tarefa que está executando
+	// Definir como solucionar casos de borda, como não execução após fim do período
+
 	if (kcb_p->tcb_p->state == TASK_RUNNING) {
-		clockCounter++;
 		printf("Task Running %d\n", kcb_p->tcb_p->id);
 		if(kcb_p->tcb_p->capacityCounter > 0) {
 			kcb_p->tcb_p->capacityCounter--;
 			printf("Capacity of running task %d\n", kcb_p->tcb_p->capacityCounter);
 		}
-		
-		// Reseta a tarefa com capacidade zerada e em um novo período
-		// if(kcb_p->tcb_p->capacityCounter == 0) {
-
-		// }
 
 		kcb_p->tcb_p->state = TASK_READY;
+		currentRunningTaskId = kcb_p->tcb_p->id;
 	}
 
 	do {
@@ -101,11 +98,31 @@ int16_t krnl_schedule_edf(void)
 			if(kcb_p->tcb_p->deadlineCounter < tcb_aux->deadlineCounter && kcb_p->tcb_p->capacityCounter > 0) {
 				tcb_aux = kcb_p->tcb_p;
 			}
+			
+			// Reseta a tarefa com capacidade zerada e em um novo período
+			if(kcb_p->tcb_p->capacityCounter == 0 && kcb_p->tcb_p->period == clockCounter) {
+				printf("Task %d reseted\n", kcb_p->tcb_p->id);
+				kcb_p->tcb_p->capacityCounter = kcb_p->tcb_p->capacity;
+				kcb_p->tcb_p->deadlineCounter = kcb_p->tcb_p->deadline;
+				kcb_p->tcb_p->state = TASK_READY;
+			}
+
+			// Temos que resetar as que passam do periodo necessitando de computações ainda
+			
+			printf("CC - %u DC - %d P %u - ID %u\n", kcb_p->tcb_p->capacityCounter, kcb_p->tcb_p->deadlineCounter, kcb_p->tcb_p->period, kcb_p->tcb_p->id);
 		}
-		printf("CC - %u DC - %u P %u - ID %u\n", kcb_p->tcb_p->capacityCounter, kcb_p->tcb_p->deadlineCounter, kcb_p->tcb_p->period, kcb_p->tcb_p->id);
 		kcb_p->tcb_p = kcb_p->tcb_p->tcb_next;
-	} while (kcb_p->tcb_p->tcb_next != kcb_p->tcb_first);
-	printf("Task EDF scheduled %d - %d\n", tcb_aux->id, tcb_aux);
+		
+		if(currentRunningTaskId == kcb_p->tcb_p->id) {
+			cycledThroughList = true;
+		}
+
+	} while (cycledThroughList == false);
+	
+	if(tcb_aux->deadlineCounter != __INT16_MAX__) {
+		printf("Task EDF scheduled %d - %d\n", tcb_aux->id, tcb_aux);
+	}
+
 	if(tcb_aux->deadlineCounter == __INT16_MAX__) {
 		return -1;
 	}
@@ -128,6 +145,8 @@ void krnl_dispatcher(void)
 	if (!setjmp(kcb_p->tcb_p->context)) {
 		krnl_delay_update();
 		krnl_guard_check();
+		printf("------ %d ------\n", clockCounter);
+		clockCounter++;
 		int id = krnl_schedule_edf();
 		if(id < 0) {
 			krnl_schedule();

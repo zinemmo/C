@@ -8,7 +8,10 @@
 
 struct kcb_s kernel_state;
 struct kcb_s *kcb_p = &kernel_state;
-int clockCounter = 1;
+uint32_t clockCounter = 1;
+uint32_t clockPeriodicComputed = 1;
+uint32_t deadlineMiss = 0;
+uint32_t periodicTasksCompleted = 0;
 
 /* kernel auxiliary functions */
 
@@ -49,12 +52,14 @@ static void krnl_sched_init(int32_t preemptive)
 }
 
 
+// TODO: AINDA PRECISA FAZER 
+// TODO: O QUE FAZER CASO NÃO TENHA TAREFAS NÃO PERIÓDICAS
 /* task scheduler and dispatcher */
 
 uint16_t krnl_schedule(void)
 {
 	if (kcb_p->tcb_p->state == TASK_RUNNING) {
-		printf("Task Running %d\n", kcb_p->tcb_p->id);
+		// printf("Task Running %d\n", kcb_p->tcb_p->id);
 		kcb_p->tcb_p->state = TASK_READY;
 	}
 
@@ -76,40 +81,51 @@ int16_t krnl_schedule_edf(void)
 	tcb_aux->deadlineCounter = __INT16_MAX__;
 	int currentRunningTaskId;
 	bool cycledThroughList = false;
-	// Duvida se temos que rodar pra sempre ou só dentro do MMC
-	// Se for pra sempre, como controlamos o reinício das tasks periódicas;
-
-	// Definir como solucionar casos de borda, como não execução após fim do período
 
 	if (kcb_p->tcb_p->state == TASK_RUNNING) {
-		printf("Task Running %d\n", kcb_p->tcb_p->id);
+		// printf("Task Running %d\n", kcb_p->tcb_p->id);
 		if(kcb_p->tcb_p->capacityCounter > 0) {
 			kcb_p->tcb_p->capacityCounter--;
-			printf("Capacity of running task %d\n", kcb_p->tcb_p->capacityCounter);
+			// printf("Capacity of running task %d\n", kcb_p->tcb_p->capacityCounter);
 		}
 
 		kcb_p->tcb_p->state = TASK_READY;
 		currentRunningTaskId = kcb_p->tcb_p->id;
+		if(kcb_p->tcb_p->isStr) {
+			clockPeriodicComputed++;
+		}
 	}
 
 	do {
 		if(kcb_p->tcb_p->isStr) {
+			kcb_p->tcb_p->periodCounter++;
 			kcb_p->tcb_p->deadlineCounter--; 
 			if(kcb_p->tcb_p->deadlineCounter < tcb_aux->deadlineCounter && kcb_p->tcb_p->capacityCounter > 0) {
 				tcb_aux = kcb_p->tcb_p;
 			}
 			
-			// Reseta a tarefa com capacidade zerada e em um novo período
-			if(kcb_p->tcb_p->capacityCounter == 0 && kcb_p->tcb_p->period == clockCounter) {
-				printf("Task %d reseted\n", kcb_p->tcb_p->id);
+			if(kcb_p->tcb_p->capacityCounter == 0 && kcb_p->tcb_p->period == kcb_p->tcb_p->periodCounter) {
+				// printf("Task %d reseted\n", kcb_p->tcb_p->id);
 				kcb_p->tcb_p->capacityCounter = kcb_p->tcb_p->capacity;
 				kcb_p->tcb_p->deadlineCounter = kcb_p->tcb_p->deadline;
+				kcb_p->tcb_p->periodCounter = 1;
+				kcb_p->tcb_p->state = TASK_READY;
+				periodicTasksCompleted++;
+			}
+
+			if(kcb_p->tcb_p->capacityCounter > 0 && kcb_p->tcb_p->period == kcb_p->tcb_p->periodCounter) {
+				// printf("Task %d lost deadline\n", kcb_p->tcb_p->id);
+				kcb_p->tcb_p->capacityCounter = kcb_p->tcb_p->capacity;
+				kcb_p->tcb_p->deadlineCounter = kcb_p->tcb_p->deadline;
+				kcb_p->tcb_p->periodCounter = 1;
 				kcb_p->tcb_p->state = TASK_READY;
 			}
 
-			// Temos que resetar as que passam do periodo necessitando de computações ainda
+			if(kcb_p->tcb_p->capacityCounter > 0 && kcb_p->tcb_p->deadlineCounter <= 0) {
+				deadlineMiss++;
+			}
 			
-			printf("CC - %u DC - %d P %u - ID %u\n", kcb_p->tcb_p->capacityCounter, kcb_p->tcb_p->deadlineCounter, kcb_p->tcb_p->period, kcb_p->tcb_p->id);
+			// printf("CC - %u - DC - %d - P - %u - PC - %u - ID - %u\n", kcb_p->tcb_p->capacityCounter, kcb_p->tcb_p->deadlineCounter, kcb_p->tcb_p->period, kcb_p->tcb_p->periodCounter, kcb_p->tcb_p->id);
 		}
 		kcb_p->tcb_p = kcb_p->tcb_p->tcb_next;
 		
@@ -120,7 +136,7 @@ int16_t krnl_schedule_edf(void)
 	} while (cycledThroughList == false);
 	
 	if(tcb_aux->deadlineCounter != __INT16_MAX__) {
-		printf("Task EDF scheduled %d - %d\n", tcb_aux->id, tcb_aux);
+		// printf("Task EDF scheduled %d - %d\n", tcb_aux->id, tcb_aux);
 	}
 
 	if(tcb_aux->deadlineCounter == __INT16_MAX__) {
@@ -142,10 +158,34 @@ int16_t krnl_schedule_edf(void)
 
 void krnl_dispatcher(void)
 {
+	if(clockCounter == __UINT32_MAX__) {
+		clockCounter = 1;
+	}
+
+	if(deadlineMiss == __UINT32_MAX__) {
+		deadlineMiss = 0;
+	}
+
+	if(clockPeriodicComputed == __UINT32_MAX__) {
+		clockPeriodicComputed = 1;
+	}
+
+	if(periodicTasksCompleted == __UINT32_MAX__) {
+		periodicTasksCompleted = 0;
+	}
+
 	if (!setjmp(kcb_p->tcb_p->context)) {
 		krnl_delay_update();
 		krnl_guard_check();
-		printf("------ %d ------\n", clockCounter);
+		// printf("------ %d ------\n", clockCounter);
+		if(clockCounter % 5 == 0) {
+			printf("------ %d ------\n", clockCounter);
+			printf("###### STATUS ######\n");
+			printf("CPU Usage -> %d\n", ((100*clockPeriodicComputed)/clockCounter));
+			printf("Deadline Misses -> %d\n", deadlineMiss);
+			printf("Periodic Tasks Completed -> %d\n", periodicTasksCompleted);
+			printf("####################\n");
+		}
 		clockCounter++;
 		int id = krnl_schedule_edf();
 		if(id < 0) {
@@ -210,6 +250,9 @@ int32_t ucx_task_add_periodic(void *task, uint16_t capacity, uint16_t period, ui
 	kcb_p->tcb_p->isStr = true;
 	kcb_p->tcb_p->deadlineCounter = deadline;
 	kcb_p->tcb_p->capacityCounter = capacity;
+	kcb_p->tcb_p->periodCounter = 1;
+
+	printf("Task ID - %u - Capacity - %u - Period - %u - Deadline - %u\n", kcb_p->tcb_p->id, kcb_p->tcb_p->capacity, kcb_p->tcb_p->period, kcb_p->tcb_p->deadline);
 	
 	return 0;
 }

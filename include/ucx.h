@@ -36,6 +36,7 @@ struct tcb_s {
 	uint16_t period;
 	int16_t deadlineCounter;
 	uint16_t capacityCounter;
+	uint16_t periodCounter;
 };
 
 /* kernel control block */

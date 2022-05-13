@@ -90,6 +90,22 @@ edf3: hal ucx
 	$(CC) $(CFLAGS) -o edf3.o app/edf3.c
 	@$(MAKE) --no-print-directory link
 
+edf4: hal ucx
+	$(CC) $(CFLAGS) -o edf4.o app/edf4.c
+	@$(MAKE) --no-print-directory link
+
+edf5: hal ucx
+	$(CC) $(CFLAGS) -o edf5.o app/edf5.c
+	@$(MAKE) --no-print-directory link
+
+edf6: hal ucx
+	$(CC) $(CFLAGS) -o edf6.o app/edf6.c
+	@$(MAKE) --no-print-directory link
+
+edf7: hal ucx
+	$(CC) $(CFLAGS) -o edf7.o app/edf7.c
+	@$(MAKE) --no-print-directory link
+
 mutex: hal ucx
 	$(CC) $(CFLAGS) -o mutex.o app/mutex.c
 	@$(MAKE) --no-print-directory link

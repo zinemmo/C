@@ -8,7 +8,7 @@
 
 struct kcb_s kernel_state;
 struct kcb_s *kcb_p = &kernel_state;
-uint32_t clockCounter = 1;
+uint32_t clockCounter = 0;
 uint32_t clockPeriodicComputed = 1;
 uint32_t deadlineMiss = 0;
 uint32_t periodicTasksCompleted = 0;
@@ -79,48 +79,49 @@ int16_t krnl_schedule_edf(void)
 	bool cycledThroughList = false;
 
 	if (kcb_p->tcb_p->state == TASK_RUNNING) {
-		// printf("Task Running %d\n", kcb_p->tcb_p->id);
-		if(kcb_p->tcb_p->capacityCounter > 0) {
-			kcb_p->tcb_p->capacityCounter--;
-			// printf("Capacity of running task %d\n", kcb_p->tcb_p->capacityCounter);
-		}
-
 		kcb_p->tcb_p->state = TASK_READY;
 		currentRunningTaskId = kcb_p->tcb_p->id;
+		
 		if(kcb_p->tcb_p->isStr) {
+			if(kcb_p->tcb_p->capacityCounter > 0) {
+				kcb_p->tcb_p->capacityCounter--;
+			}
+
 			clockPeriodicComputed++;
 		}
 	}
 
 	do {
 		if(kcb_p->tcb_p->isStr) {
+			if(kcb_p->tcb_p->period < kcb_p->tcb_p->periodCounter) {
+				kcb_p->tcb_p->capacityCounter = kcb_p->tcb_p->capacity;
+				kcb_p->tcb_p->deadlineCounter = kcb_p->tcb_p->deadline;
+				kcb_p->tcb_p->periodCounter = 0;
+				kcb_p->tcb_p->state = TASK_READY;
+			}
+			// Se nao funcionar botar esses dois pra cima do if de cima
 			kcb_p->tcb_p->periodCounter++;
 			kcb_p->tcb_p->deadlineCounter--;
 
-			if(kcb_p->tcb_p->capacityCounter > 0 && kcb_p->tcb_p->period == kcb_p->tcb_p->periodCounter) {
-				// printf("Task %d lost deadline\n", kcb_p->tcb_p->id);
-				kcb_p->tcb_p->capacityCounter = kcb_p->tcb_p->capacity;
-				kcb_p->tcb_p->deadlineCounter = kcb_p->tcb_p->deadline;
-				kcb_p->tcb_p->periodCounter = 0;
-				kcb_p->tcb_p->state = TASK_READY;
-			} else if(kcb_p->tcb_p->capacityCounter == 0 && kcb_p->tcb_p->period == kcb_p->tcb_p->periodCounter) {
-				// printf("Task %d reseted\n", kcb_p->tcb_p->id);
-				kcb_p->tcb_p->capacityCounter = kcb_p->tcb_p->capacity;
-				kcb_p->tcb_p->deadlineCounter = kcb_p->tcb_p->deadline;
-				kcb_p->tcb_p->periodCounter = 0;
-				kcb_p->tcb_p->state = TASK_READY;
-				periodicTasksCompleted++;
-			}
 
 			if(kcb_p->tcb_p->deadlineCounter < tcb_aux->deadlineCounter && kcb_p->tcb_p->capacityCounter > 0) {
 				tcb_aux = kcb_p->tcb_p;
 			}
 
-			if(kcb_p->tcb_p->capacityCounter > 0 && kcb_p->tcb_p->deadlineCounter <= 0) {
+			if(kcb_p->tcb_p->capacityCounter > 0 && kcb_p->tcb_p->deadlineCounter < 0) {
+				// printf("Task %d lost deadline\n", kcb_p->tcb_p->id);
 				deadlineMiss++;
 			}
-			
+
+			if(kcb_p->tcb_p->period == kcb_p->tcb_p->periodCounter && kcb_p->tcb_p->capacityCounter == 0) {
+				kcb_p->tcb_p->capacityCounter = kcb_p->tcb_p->capacity;
+				kcb_p->tcb_p->deadlineCounter = kcb_p->tcb_p->deadline;
+				kcb_p->tcb_p->periodCounter = 0;
+				kcb_p->tcb_p->state = TASK_READY;
+			}
+
 			// printf("CC - %u - DC - %d - P - %u - PC - %u - ID - %u\n", kcb_p->tcb_p->capacityCounter, kcb_p->tcb_p->deadlineCounter, kcb_p->tcb_p->period, kcb_p->tcb_p->periodCounter, kcb_p->tcb_p->id);
+			// printf("%u%d%u%u\n", kcb_p->tcb_p->capacityCounter, kcb_p->tcb_p->deadlineCounter, kcb_p->tcb_p->periodCounter, kcb_p->tcb_p->id);
 		}
 		kcb_p->tcb_p = kcb_p->tcb_p->tcb_next;
 		
@@ -129,10 +130,6 @@ int16_t krnl_schedule_edf(void)
 		}
 
 	} while (cycledThroughList == false);
-	
-	if(tcb_aux->deadlineCounter != __INT16_MAX__) {
-		// printf("Task EDF scheduled %d - %d\n", tcb_aux->id, tcb_aux);
-	}
 
 	kcb_p->tcb_p = tcb_aux;
 	kcb_p->tcb_p->state = TASK_RUNNING;
@@ -173,19 +170,29 @@ void krnl_dispatcher(void)
 	if (!setjmp(kcb_p->tcb_p->context)) {
 		krnl_delay_update();
 		krnl_guard_check();
-		if(clockCounter % 5 == 0) {
-			// printf("------ %d ------\n", clockCounter);
+		// if(clockCounter % 5 == 0) {
+			// printf("-%d-\n", clockCounter);
 			// printf("###### STATUS ######\n");
 			// printf("CPU Usage -> %d\n", ((100*clockPeriodicComputed)/clockCounter));
 			// printf("Deadline Misses -> %d\n", deadlineMiss);
 			// printf("Periodic Tasks Completed -> %d\n", periodicTasksCompleted);
 			// printf("####################\n");
+		// }
+
+		if(clockCounter == 0) {
+			clockCounter++;
+			krnl_schedule();
+			_interrupt_tick();
+			longjmp(kcb_p->tcb_p->context, 1);
 		}
-		clockCounter++;
+
 		int id = krnl_schedule_edf();
 		if(id < 0) {
 			krnl_schedule();
 		}
+
+		clockCounter++;
+
 		_interrupt_tick();
 		longjmp(kcb_p->tcb_p->context, 1);
 	}

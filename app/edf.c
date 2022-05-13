@@ -42,10 +42,10 @@ void task0(void)
 
 int32_t app_main(void)
 {
-	ucx_task_add(task3, DEFAULT_GUARD_SIZE);
+	ucx_task_add_periodic(task0, 5, 15, 8, DEFAULT_GUARD_SIZE);
 	ucx_task_add_periodic(task1, 2, 15, 12, DEFAULT_GUARD_SIZE);
 	ucx_task_add_periodic(task2, 3, 10, 9, DEFAULT_GUARD_SIZE);
-	ucx_task_add_periodic(task0, 5, 15, 8, DEFAULT_GUARD_SIZE);
+	ucx_task_add(task3, DEFAULT_GUARD_SIZE);
 
 	// A última task está sendo executada primeiro
 	// start UCX/OS, preemptive mode

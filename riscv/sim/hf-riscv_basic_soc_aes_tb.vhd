@@ -42,6 +42,7 @@ architecture tb of tb is
 	signal data_i :  std_logic_vector (7 downto 0);
 	signal data_o :  std_logic_vector (7 downto 0);
 	signal done_o :  std_logic;
+	signal data_read_aes, data_read_aes_s 
 begin
 
 	process						--25Mhz system clock
@@ -148,7 +149,7 @@ begin
 		if reset = '1' then
 			data_read_xtea_s <= (others => '0');
 		elsif clock_in'event and clock_in = '1' then
-			if (ext_periph = '1') then	-- XTEA is at 0xe7000000
+			if (ext_periph = '1') then	-- AES is at 0xe7000000
 				case address(7 downto 4) is
 					when "0000" =>		-- control	0xe7000000	(bit2 - ready (R), bit1 - encrypt (RW), bit0 - start (RW)
 						data_read_xtea_s <= x"000000" & "00000" & ready & control;
@@ -186,47 +187,28 @@ begin
 				case address(7 downto 4) is
 					when "0000" =>		-- control	0xe7000000	(bit2 - ready (R), bit1 - encrypt (RW), bit0 - start (RW)
 						control <= data_write_periph(1 downto 0);
-					when "0001" =>		-- key[0]	0xe7000010
-						key(127 downto 96) <= data_write_periph;
-					when "0010" =>		-- key[1]	0xe7000020
-						key(95 downto 64) <= data_write_periph;
-					when "0011" =>		-- key[2]	0xe7000030
-						key(63 downto 32) <= data_write_periph;
-					when "0100" =>		-- key[3]	0xe7000040
-						key(31 downto 0) <= data_write_periph;
-					when "0101" =>		-- input[0]	0xe7000050
-						input(63 downto 32) <= data_write_periph;
-					when "0110" =>		-- input[1]	0xe7000060
-						input(31 downto 0) <= data_write_periph;
+						enc <= data_write_periph(0);
+					when "0001" =>		-- key[i]	0xe7000010
+						key_i <= data_write_periph(7 downto 0);
+					when "0010" =>		-- data[i]	0xe7000020
+						data_i <= data_write_periph(7 downto 0);
 					when others =>
 				end case;
 			end if;
 		end if;
 	end process;
-	
-	-- XTEA core
-	crypto_core: entity work.xtea
-	port map(	clock => clock_in,
-			reset => reset,
-			start => control(0),
-			encrypt => control(1),
-			key => key,
-			input => input,
-			output => output,
-			ready => ready
-	);
 
 	-- AES core
 	crypto_core: entity work.mini_aes
 	port map (
 		clock  => clock_in,
-		clear  => clear,
+		clear  => clear, -- 1 bit of reset
 		load_i => load_i,
 		enc    => enc, -- active low (e.g. 0 = encrypt, 1 = decrypt)
-		key_i  => key_i,
-		data_i => data_i,
-		data_o => data_o,
-		done_o => done_o
+		key_i  => key_i, -- 8 bits of key input
+		data_i => data_i, -- 8 bits of data input
+		data_o => data_o, -- 8 bits of data output
+		done_o => done_o -- 1 bit of signaling of finishing
 	);
 
 	-- boot ROM

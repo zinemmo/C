@@ -121,6 +121,10 @@ eeprom_sim:
 	printf "%08x\n" `stat -L -c %s code.txt` >> eeprom.txt
 	cat code.txt >> eeprom.txt
 
+aes_hw: crt
+	$(GCC_$(ARCH)) -o aes_hw.o app/aes_hw.c
+	@$(MAKE) --no-print-directory link
+
 animal: crt
 	$(GCC_$(ARCH)) -o animal.o app/animal.c
 	@$(MAKE) --no-print-directory link

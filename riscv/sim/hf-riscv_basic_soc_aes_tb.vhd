@@ -30,7 +30,7 @@ architecture tb of tb is
 	
 	signal ext_periph, ext_periph_dly, ready: std_logic;
 	signal key: std_logic_vector(127 downto 0);
-	signal input, output: std_logic_vector(63 downto 0);
+	signal input, output: std_logic_vector(127 downto 0);
 	signal data_read_xtea, data_read_xtea_s: std_logic_vector(31 downto 0);
 	signal control: std_logic_vector(1 downto 0);
 
@@ -42,7 +42,13 @@ architecture tb of tb is
 	signal data_i :  std_logic_vector (7 downto 0);
 	signal data_o :  std_logic_vector (7 downto 0);
 	signal done_o :  std_logic;
-	signal data_read_aes, data_read_aes_s 
+	signal data_read_aes, data_read_aes_s : std_logic_vector (31 downto 0);
+	-- signal data_read_aes_s : std_logic_vector (127 downto 0);
+	
+	-- PARSER SIGNALS
+	signal parser_key, parser_input, parser_output : integer := 0;
+	signal begin_key, begin_input, begin_output : integer := 127;
+	signal end_key, end_input, end_output : integer := 96;
 begin
 
 	process						--25Mhz system clock
@@ -88,7 +94,7 @@ begin
 
 	boot_enable_n <= '0' when (address(31 downto 28) = "0000" and stall_sig = '0') or reset = '1' else '1';
 	ram_enable_n <= '0' when (address(31 downto 28) = "0100" and stall_sig = '0') or reset = '1' else '1';
-	data_read <= data_read_xtea when ext_periph = '1' or ext_periph_dly = '1' else data_read_periph when periph = '1' or periph_dly = '1' else data_read_boot when address(31 downto 28) = "0000" and ram_dly = '0' else data_read_ram;
+	data_read <= data_read_aes when ext_periph = '1' or ext_periph_dly = '1' else data_read_periph when periph = '1' or periph_dly = '1' else data_read_boot when address(31 downto 28) = "0000" and ram_dly = '0' else data_read_ram;
 	data_w_n_ram <= not data_we;
 
 	process(clock_in, reset)
@@ -141,62 +147,151 @@ begin
 		gpiob_ddr => gpiob_ddr
 	);
 	
-	data_read_xtea <= data_read_xtea_s(7 downto 0) & data_read_xtea_s(15 downto 8) & data_read_xtea_s(23 downto 16) & data_read_xtea_s(31 downto 24);
+	data_read_aes <= data_read_aes_s(7 downto 0) & data_read_aes_s(15 downto 8) & data_read_aes_s(23 downto 16) & data_read_aes_s(31 downto 24);
 	ext_periph <= '1' when address(31 downto 24) = x"e7" else '0';
 	
-	process (clock_in, reset, address, key, input, output)
+	read_proc: process (clock_in, reset, address, key, input, output)
 	begin
 		if reset = '1' then
-			data_read_xtea_s <= (others => '0');
+			data_read_aes_s <= (others => '0');
+			begin_key <= 127;
+			begin_input <= 127;
+			begin_output <= 127;
+			end_key <= 96;
+			end_input <= 96;
+			end_output <= 96;
 		elsif clock_in'event and clock_in = '1' then
 			if (ext_periph = '1') then	-- AES is at 0xe7000000
 				case address(7 downto 4) is
 					when "0000" =>		-- control	0xe7000000	(bit2 - ready (R), bit1 - encrypt (RW), bit0 - start (RW)
-						data_read_xtea_s <= x"000000" & "00000" & ready & control;
-					when "0001" =>		-- key[0]	0xe7000010
-						data_read_xtea_s <= key(127 downto 96);
-					when "0010" =>		-- key[1]	0xe7000020
-						data_read_xtea_s <= key(95 downto 64);
-					when "0011" =>		-- key[2]	0xe7000030
-						data_read_xtea_s <= key(63 downto 32);
-					when "0100" =>		-- key[3]	0xfa000040
-						data_read_xtea_s <= key(31 downto 0);
-					when "0101" =>		-- input[0]	0xe7000050
-						data_read_xtea_s <= input(63 downto 32);
-					when "0110" =>		-- input[1]	0xe7000060
-						data_read_xtea_s <= input(31 downto 0);
-					when "0111" =>		-- output[0]	0xe7000070
-						data_read_xtea_s <= output(63 downto 32);
-					when "1000" =>		-- output[1]	0xe7000080
-						data_read_xtea_s <= output(31 downto 0);
+						data_read_aes_s <= x"000000" & "000000" & done_o & enc;
+					when "0001" =>		-- key	0xe7000010
+						if(begin_key = 31 and end_key = 0) then
+							data_read_aes_s <= key(begin_key downto end_key);
+							begin_key <= 127;
+							end_key <= 96;
+						else
+							data_read_aes_s <= key(begin_key downto end_key);
+							begin_key <= begin_key - 32;
+							end_key <= end_key - 32;
+						end if;
+					when "0010" =>		-- input	0xe7000020
+						if(begin_input = 31 and end_input = 0) then
+							data_read_aes_s <= input(begin_input downto end_input);
+							begin_input <= 127;
+							end_input <= 96;
+						else
+							data_read_aes_s <= input(begin_input downto end_input);
+							begin_input <= begin_input - 32;
+							end_input <= end_input - 32;
+						end if;
+					when "0011" =>		-- output	0xe7000020
+						if(begin_output = 31 and end_output = 0) then
+							data_read_aes_s <= output(begin_output downto end_output);
+							begin_output <= 127;
+							end_output <= 96;
+						else
+							data_read_aes_s <= output(begin_output downto end_output);
+							begin_output <= begin_output - 32;
+							end_output <= end_output - 32;
+						end if;
 					when others =>
-						data_read_xtea_s <= (others => '0');
+						data_read_aes_s <= (others => '0');
 				end case;
 			end if;
 		end if;
 	end process;
 
-	process (clock_in, reset, address, control, key, input, output)
+	write_proc: process (clock_in, reset, address, control, key_i, data_i, enc, load_i)
 	begin
 		if reset = '1' then
-			key <= (others => '0');
-			input <= (others => '0');
+			key_i <= (others => '0');
+			data_i <= (others => '0');
+			enc <= '0';
+			load_i <= '0';
 			control <= "00";
 		elsif clock_in'event and clock_in = '1' then
-			if (ext_periph = '1' and data_we /= "0000") then	-- XTEA is at 0xe7000000
+			if (ext_periph = '1' and data_we /= "0000") then	-- AES is at 0xe7000000
 				case address(7 downto 4) is
-					when "0000" =>		-- control	0xe7000000	(bit2 - ready (R), bit1 - encrypt (RW), bit0 - start (RW)
+					when "0000" =>		-- control	0xe7000000	(bit1 - start receiving data, bit0 - enc dec selector)
 						control <= data_write_periph(1 downto 0);
+						load_i <= data_write_periph(1);
 						enc <= data_write_periph(0);
-					when "0001" =>		-- key[i]	0xe7000010
+					when "0001" =>		-- key 8 bits	0xe7000010
 						key_i <= data_write_periph(7 downto 0);
-					when "0010" =>		-- data[i]	0xe7000020
+					when "0010" =>		-- data 8 bits	0xe7000020
 						data_i <= data_write_periph(7 downto 0);
 					when others =>
 				end case;
 			end if;
 		end if;
 	end process;
+
+	-- parse_key_proc: process (reset, key_i)
+	-- 	variable begin_vector, end_vector : integer;
+	-- begin
+	-- 	if reset = '1' then
+	-- 		parser_key <= 0;
+	-- 		begin_vector := 127;
+	-- 		end_vector := 120;
+	-- 	else
+	-- 		if parser_key < 15 then
+	-- 			begin_vector := begin_vector - 8;
+	-- 			end_vector := end_vector - 8;
+	-- 			-- key(begin_vector downto end_vector) <= key_i;
+	-- 			parser_key <= parser_key + 1;
+	-- 		else 
+	-- 			begin_vector := 127;
+	-- 			begin_vector := 120;
+	-- 			-- key(7 downto 0) <= key_i;
+	-- 			parser_key <= 0;
+	-- 		end if;
+	-- 	end if;
+	-- end process;
+
+	-- parse_input_proc: process (reset, data_i)
+	-- 	variable begin_vector, end_vector : integer;
+	-- begin
+	-- 	if reset = '1' then
+	-- 		parser_input <= 0;
+	-- 		begin_vector := 127;
+	-- 		end_vector := 120;
+	-- 	else
+	-- 		if parser_input < 15 then
+	-- 			begin_vector := begin_vector - 8;
+	-- 			end_vector := end_vector - 8;
+	-- 			-- input(begin_vector downto end_vector) <= data_i;
+	-- 			parser_input <= parser_input + 1;
+	-- 		else 
+	-- 			begin_vector := 127;
+	-- 			begin_vector := 120;
+	-- 			-- input(7 downto 0) <= data_i;
+	-- 			parser_input <= 0;
+	-- 		end if;
+	-- 	end if;
+	-- end process;
+
+	-- parse_output_proc: process (reset, data_o)
+	-- 	variable begin_vector, end_vector : integer;
+	-- begin
+	-- 	if reset = '1' then
+	-- 		parser_output <= 0;
+	-- 		begin_vector := 127;
+	-- 		end_vector := 120;
+	-- 	else
+	-- 		if parser_output < 15 then
+	-- 			begin_vector := begin_vector - 8;
+	-- 			end_vector := end_vector - 8;
+	-- 			-- output(begin_vector downto end_vector) <= data_o;
+	-- 			parser_output <= parser_output + 1;
+	-- 		else 
+	-- 			begin_vector := 127;
+	-- 			begin_vector := 120;
+	-- 			-- output(7 downto 0) <= data_o;
+	-- 			parser_output <= 0;
+	-- 		end if;
+	-- 	end if;
+	-- end process;
 
 	-- AES core
 	crypto_core: entity work.mini_aes

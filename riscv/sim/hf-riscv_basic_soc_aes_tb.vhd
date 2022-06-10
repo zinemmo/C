@@ -29,22 +29,31 @@ architecture tb of tb is
 	signal gpio_sig, gpio_sig2, gpio_sig3: std_logic := '0';
 	
 	signal ext_periph, ext_periph_dly, ready: std_logic;
-	signal key: std_logic_vector(127 downto 0);
-	signal input, output: std_logic_vector(127 downto 0);
+	signal key: std_logic_vector(127 downto 0) := x"00000000000000000000000000000000";
+	signal input, output: std_logic_vector(127 downto 0) := x"00000000000000000000000000000000";
 	signal data_read_xtea, data_read_xtea_s: std_logic_vector(31 downto 0);
 	signal control: std_logic_vector(1 downto 0);
 
 	-- AES SIGNALS
-	signal clear  :  std_logic;
-	signal load_i :  std_logic;
-	signal enc    :  std_logic;  -- active low (e.g. 0 = encrypt, 1 = decrypt)
-	signal key_i  :  std_logic_vector (7 downto 0);
-	signal data_i :  std_logic_vector (7 downto 0);
+	signal clear  :  std_logic := '0';
+	signal load_i :  std_logic := '0';
+	signal enc    :  std_logic := '0';  -- active low (e.g. 0 = encrypt, 1 = decrypt)
+	signal key_i  :  std_logic_vector (7 downto 0) := x"00";
+	signal key_i_driver : std_logic_vector(31 downto 0) := x"00000000";
+	signal key_finished	:	std_logic := '0';
+	signal data_i_aes :  std_logic_vector (7 downto 0);
+	signal data_i_driver : std_logic_vector(31 downto 0) := x"00000000";
+	signal data_finished	:	std_logic := '0';
 	signal data_o :  std_logic_vector (7 downto 0);
 	signal done_o :  std_logic;
-	signal data_read_aes, data_read_aes_s : std_logic_vector (31 downto 0);
+	signal done_aes	:	std_logic := '0';
+	signal data_read_aes, data_read_aes_s : std_logic_vector (31 downto 0) := x"00000000"; 
 	-- signal data_read_aes_s : std_logic_vector (127 downto 0);
-	
+
+	-- AES RECEIVE HELPERS
+	signal rec_key_counter, rec_data_counter : integer := 127;
+	-- AES SEND HELPERS
+	signal sen_aes_counter : integer := 127;
 	-- PARSER SIGNALS
 	signal parser_key, parser_input, parser_output : integer := 0;
 	signal begin_key, begin_input, begin_output : integer := 127;
@@ -150,41 +159,21 @@ begin
 	data_read_aes <= data_read_aes_s(7 downto 0) & data_read_aes_s(15 downto 8) & data_read_aes_s(23 downto 16) & data_read_aes_s(31 downto 24);
 	ext_periph <= '1' when address(31 downto 24) = x"e7" else '0';
 	
-	read_proc: process (clock_in, reset, address, key, input, output)
+	read_proc: process (clock_in, reset, address, key_i_driver, data_i_driver, done_aes)
 	begin
 		if reset = '1' then
 			data_read_aes_s <= (others => '0');
-			begin_key <= 127;
-			begin_input <= 127;
 			begin_output <= 127;
-			end_key <= 96;
-			end_input <= 96;
 			end_output <= 96;
 		elsif clock_in'event and clock_in = '1' then
 			if (ext_periph = '1') then	-- AES is at 0xe7000000
 				case address(7 downto 4) is
 					when "0000" =>		-- control	0xe7000000	(bit2 - ready (R), bit1 - encrypt (RW), bit0 - start (RW)
-						data_read_aes_s <= x"000000" & "000000" & done_o & enc;
-					when "0001" =>		-- key	0xe7000010
-						if(begin_key = 31 and end_key = 0) then
-							data_read_aes_s <= key(begin_key downto end_key);
-							begin_key <= 127;
-							end_key <= 96;
-						else
-							data_read_aes_s <= key(begin_key downto end_key);
-							begin_key <= begin_key - 32;
-							end_key <= end_key - 32;
-						end if;
+						data_read_aes_s <= x"0000000" & '0' & done_aes & control;
+					when "0001" =>
+						data_read_aes_s <=  key_i_driver;
 					when "0010" =>		-- input	0xe7000020
-						if(begin_input = 31 and end_input = 0) then
-							data_read_aes_s <= input(begin_input downto end_input);
-							begin_input <= 127;
-							end_input <= 96;
-						else
-							data_read_aes_s <= input(begin_input downto end_input);
-							begin_input <= begin_input - 32;
-							end_input <= end_input - 32;
-						end if;
+						data_read_aes_s <= data_i_driver;
 					when "0011" =>		-- output	0xe7000020
 						if(begin_output = 31 and end_output = 0) then
 							data_read_aes_s <= output(begin_output downto end_output);
@@ -202,74 +191,101 @@ begin
 		end if;
 	end process;
 
-	write_proc: process (clock_in, reset, address, control, key_i, data_i, enc, load_i)
+	-- PROCESS TO CONVERT FROM 8 BITS FROM AES TO 32 BITS TO HFRISCV
+
+	write_proc: process (clock_in, reset, address)
 	begin
 		if reset = '1' then
-			key_i <= (others => '0');
-			data_i <= (others => '0');
+			key_i_driver <= (others => '0');
+			data_i_driver <= (others => '0');
 			enc <= '0';
-			load_i <= '0';
 			control <= "00";
 		elsif clock_in'event and clock_in = '1' then
 			if (ext_periph = '1' and data_we /= "0000") then	-- AES is at 0xe7000000
 				case address(7 downto 4) is
-					when "0000" =>		-- control	0xe7000000	(bit1 - start receiving data, bit0 - enc dec selector)
+					when "0000" =>		-- control	0xe7000000	(bit1 - encrypt (RW), bit0 - start (RW))
 						control <= data_write_periph(1 downto 0);
-						load_i <= data_write_periph(1);
-						enc <= data_write_periph(0);
-					when "0001" =>		-- key 8 bits	0xe7000010
-						key_i <= data_write_periph(7 downto 0);
-					when "0010" =>		-- data 8 bits	0xe7000020
-						data_i <= data_write_periph(7 downto 0);
+						enc <= data_write_periph(1);
+					when "0001" =>		-- key 32 bits	0xe7000010
+						key_i_driver <= data_write_periph(31 downto 0);
+					when "0010" =>		-- data 32 bits	0xe7000020
+						data_i_driver <= data_write_periph(31 downto 0);
 					when others =>
 				end case;
 			end if;
 		end if;
 	end process;
 
-	-- parse_key_proc: process (reset, key_i)
-	-- 	variable begin_vector, end_vector : integer;
-	-- begin
-	-- 	if reset = '1' then
-	-- 		parser_key <= 0;
-	-- 		begin_vector := 127;
-	-- 		end_vector := 120;
-	-- 	else
-	-- 		if parser_key < 15 then
-	-- 			begin_vector := begin_vector - 8;
-	-- 			end_vector := end_vector - 8;
-	-- 			-- key(begin_vector downto end_vector) <= key_i;
-	-- 			parser_key <= parser_key + 1;
-	-- 		else 
-	-- 			begin_vector := 127;
-	-- 			begin_vector := 120;
-	-- 			-- key(7 downto 0) <= key_i;
-	-- 			parser_key <= 0;
-	-- 		end if;
-	-- 	end if;
-	-- end process;
+	parse_key_proc: process (reset, key_i_driver, load_i)
+	begin
+		if load_i = '1' then
+			key_finished <= '0';
+		end if;
 
-	-- parse_input_proc: process (reset, data_i)
-	-- 	variable begin_vector, end_vector : integer;
-	-- begin
-	-- 	if reset = '1' then
-	-- 		parser_input <= 0;
-	-- 		begin_vector := 127;
-	-- 		end_vector := 120;
-	-- 	else
-	-- 		if parser_input < 15 then
-	-- 			begin_vector := begin_vector - 8;
-	-- 			end_vector := end_vector - 8;
-	-- 			-- input(begin_vector downto end_vector) <= data_i;
-	-- 			parser_input <= parser_input + 1;
-	-- 		else 
-	-- 			begin_vector := 127;
-	-- 			begin_vector := 120;
-	-- 			-- input(7 downto 0) <= data_i;
-	-- 			parser_input <= 0;
-	-- 		end if;
-	-- 	end if;
-	-- end process;
+		if reset = '1' then
+			rec_key_counter <= 127;
+			key <= (others => '0');
+			key_finished <= '0';
+		elsif reset = '0' and key_i_driver'event then
+			key(rec_key_counter downto rec_key_counter-31) <= key_i_driver;
+			rec_key_counter <= rec_key_counter - 32;
+			if(rec_key_counter = 31) then
+				rec_key_counter <= 127;
+				key_finished <= '1';
+			else
+				key_finished <= '0';
+			end if;
+		end if;
+	end process;
+
+	parse_input_proc: process (reset, data_i_driver, load_i)
+	begin
+		if load_i = '1' then
+			data_finished <= '0';
+		end if;
+		
+		if reset = '1' then
+			rec_data_counter <= 127;
+			input <= (others => '0');
+			data_finished <= '0';
+		elsif reset = '0' and data_i_driver'event then
+			input(rec_data_counter downto rec_data_counter-31) <= data_i_driver;
+			rec_data_counter <= rec_data_counter - 32;
+			if(rec_data_counter = 31) then
+				rec_data_counter <= 127;
+				data_finished <= '1';
+			else
+				data_finished <= '0';
+			end if;
+		end if;
+	end process;
+
+	load_i_proc: process (clock_in, key_finished, data_finished, done_o)
+	begin 
+		if clock_in'event and clock_in = '1' then
+			if load_i = '1' then
+				if sen_aes_counter > 0 then
+				key_i <= key(sen_aes_counter downto sen_aes_counter-7);
+				data_i_aes <= input(sen_aes_counter downto sen_aes_counter-7);
+				sen_aes_counter <= sen_aes_counter - 8;
+				else
+					sen_aes_counter <= 127;
+					-- TODO: checar se ele retorna em 0 um ciclo após fim dos dados
+					-- ou se retorna no mesmo ciclo do fim de dados
+					load_i <= '0';
+				end if;
+			else
+				if (key_finished = '1' and data_finished = '1' and done_o /= '1') then
+					load_i <= '1';
+					key_i <= key(sen_aes_counter downto sen_aes_counter-7);
+					data_i_aes <= input(sen_aes_counter downto sen_aes_counter-7);
+					sen_aes_counter <= sen_aes_counter - 8;
+				else
+					load_i <= '0';
+				end if;
+			end if;
+		end if;
+	end process;
 
 	-- parse_output_proc: process (reset, data_o)
 	-- 	variable begin_vector, end_vector : integer;
@@ -301,7 +317,7 @@ begin
 		load_i => load_i,
 		enc    => enc, -- active low (e.g. 0 = encrypt, 1 = decrypt)
 		key_i  => key_i, -- 8 bits of key input
-		data_i => data_i, -- 8 bits of data input
+		data_i => data_i_aes, -- 8 bits of data input
 		data_o => data_o, -- 8 bits of data output
 		done_o => done_o -- 1 bit of signaling of finishing
 	);

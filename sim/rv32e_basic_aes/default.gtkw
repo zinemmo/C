@@ -1,0 +1,83 @@
+[*]
+[*] GTKWave Analyzer v3.3.104 (w)1999-2020 BSI
+[*] Fri Jun 10 19:26:32 2022
+[*]
+[dumpfile] "(null)"
+[savefile] "/home/user/Desktop/hf-risc/sim/rv32e_basic_aes/default.gtkw"
+[timestart] 13684100000
+[size] 1920 1149
+[pos] -911 -540
+*-25.775673 13880000000 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[treeopen] tb.
+[sst_width] 214
+[signals_width] 294
+[sst_expanded] 1
+[sst_vpaned_height] 728
+@28
+tb.clock_in
+tb.reset
+@200
+-
+@22
+tb.address[31:0]
+tb.data_read[31:0]
+@28
+tb.data_read[31:0]
+@22
+tb.data_read_aes[31:0]
+@28
+tb.data_read_aes[31:0]
+@22
+tb.data_read_aes_s[31:0]
+@28
+tb.data_read_aes_s[31:0]
+@22
+tb.data_write_periph[31:0]
+@28
+tb.control[1:0]
+tb.enc
+tb.done_o
+tb.data_finished
+@200
+-
+@420
+tb.rec_key_counter
+@22
+tb.key[127:0]
+tb.key_i[7:0]
+@200
+-
+@420
+tb.rec_data_counter
+@22
+tb.input[127:0]
+tb.data_i_aes[7:0]
+@200
+-
+@28
+tb.control[1:0]
+tb.enc
+tb.load_i
+@200
+-
+@28
+tb.crypto_core.clock
+tb.crypto_core.clear
+tb.crypto_core.enc
+tb.crypto_core.load_i
+@22
+tb.crypto_core.data_i[7:0]
+tb.crypto_core.key_i[7:0]
+@28
+tb.crypto_core.done_o
+tb.crypto_core.done
+@200
+-
+@22
+tb.crypto_core.data_i_int[127:0]
+tb.crypto_core.key_i_int[127:0]
+tb.crypto_core.fifo16x8[127:0]
+tb.crypto_core.fifo16x8i[127:0]
+tb.crypto_core.fifo16x8o[127:0]
+[pattern_trace] 1
+[pattern_trace] 0

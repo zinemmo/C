@@ -122,7 +122,8 @@ eeprom_sim:
 	cat code.txt >> eeprom.txt
 
 aes_hw: crt
-	$(GCC_$(ARCH)) -o aes_hw.o app/aes_hw.c
+	$(GCC_$(ARCH)) -o aes.o app/aes_tiny/aes.c
+	$(GCC_$(ARCH)) -o aes_hw.o app/aes_hw.c 
 	@$(MAKE) --no-print-directory link
 
 animal: crt

@@ -126,6 +126,11 @@ aes_hw: crt
 	$(GCC_$(ARCH)) -o aes_hw.o app/aes_hw.c 
 	@$(MAKE) --no-print-directory link
 
+aes_hw_cbc: crt
+	$(GCC_$(ARCH)) -o aes.o app/aes_tiny/aes.c
+	$(GCC_$(ARCH)) -o aes_hw_cbc.o app/aes_hw_cbc.c 
+	@$(MAKE) --no-print-directory link
+
 animal: crt
 	$(GCC_$(ARCH)) -o animal.o app/animal.c
 	@$(MAKE) --no-print-directory link

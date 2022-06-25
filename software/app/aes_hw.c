@@ -25,12 +25,12 @@ int main(void){
 
 	printf("message: %8x%8x%8x%8x%8x%8x%8x%8x%8x%8x%8x%8x%8x%8x%8x%8x\n", aes_data[0], aes_data[1], aes_data[2], aes_data[3], aes_data[4], aes_data[5], aes_data[6], aes_data[7], aes_data[8], aes_data[9], aes_data[10], aes_data[11], aes_data[12], aes_data[13], aes_data[14], aes_data[15]);
 	cycles = TIMER0;
-	AES128_ECB_encrypt(&aes_data, &aes_tiny_key, &aes_tiny_enc_return);
+	AES128_ECB_encrypt(aes_data, aes_tiny_key, aes_tiny_enc_return);
 	cycles = TIMER0 - cycles;
 	printf("enc message: %8x%8x%8x%8x%8x%8x%8x%8x%8x%8x%8x%8x%8x%8x%8x%8x\n", aes_tiny_enc_return[0], aes_tiny_enc_return[1], aes_tiny_enc_return[2], aes_tiny_enc_return[3], aes_tiny_enc_return[4], aes_tiny_enc_return[5], aes_tiny_enc_return[6], aes_tiny_enc_return[7], aes_tiny_enc_return[8], aes_tiny_enc_return[9], aes_tiny_enc_return[10], aes_tiny_enc_return[11], aes_tiny_enc_return[12], aes_tiny_enc_return[13], aes_tiny_enc_return[14], aes_tiny_enc_return[15]);
 	printf("%d cycles\n", cycles);
 	cycles = TIMER0;
-	AES128_ECB_decrypt(&aes_tiny_enc_return, &aes_tiny_key, &aes_tiny_dec_return);
+	AES128_ECB_decrypt(aes_tiny_enc_return, aes_tiny_key, aes_tiny_dec_return);
 	cycles = TIMER0 - cycles;
 	printf("dec message: %8x%8x%8x%8x%8x%8x%8x%8x%8x%8x%8x%8x%8x%8x%8x%8x\n", aes_tiny_dec_return[0], aes_tiny_dec_return[1], aes_tiny_dec_return[2], aes_tiny_dec_return[3], aes_tiny_dec_return[4], aes_tiny_dec_return[5], aes_tiny_dec_return[6], aes_tiny_dec_return[7], aes_tiny_dec_return[8], aes_tiny_dec_return[9], aes_tiny_dec_return[10], aes_tiny_dec_return[11], aes_tiny_dec_return[12], aes_tiny_dec_return[13], aes_tiny_dec_return[14], aes_tiny_dec_return[15]);
 	printf("%d cycles\n", cycles);

@@ -1,0 +1,9 @@
+*.o
+*.bin
+*.map
+*.cnt
+*.elf
+*.lst
+*.sec
+*.cf
+sofware/code.txt

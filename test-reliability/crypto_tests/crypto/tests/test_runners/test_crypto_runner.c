@@ -1,0 +1,72 @@
+#include "unity.h"
+#include "unity_fixture.h"
+
+TEST_GROUP_RUNNER(Crypto)
+{
+    // XTEA
+    RUN_TEST_CASE(Crypto, xtea_enc_test_const);
+    RUN_TEST_CASE(Crypto, xtea_enc_test_encrypt);
+    RUN_TEST_CASE(Crypto, xtea_enc_test_encrypt_key_128);
+    RUN_TEST_CASE(Crypto, xtea_enc_test_encrypt_key_192);
+    RUN_TEST_CASE(Crypto, xtea_enc_test_encrypt_key_256_plus);
+    RUN_TEST_CASE(Crypto, xtea_dec_test_const);
+    RUN_TEST_CASE(Crypto, xtea_enc_test_decrypt);
+    RUN_TEST_CASE(Crypto, xtea_dec_test_decrypt_key_128);
+    RUN_TEST_CASE(Crypto, xtea_dec_test_decrypt_key_192);
+    RUN_TEST_CASE(Crypto, xtea_dec_test_decrypt_key_256_plus);
+    RUN_TEST_CASE(Crypto, xtea_should_run_enc);
+    RUN_TEST_CASE(Crypto, xtea_should_run_dec);
+    RUN_TEST_CASE(Crypto, xtea_should_run_enc_dec);
+    RUN_TEST_CASE(Crypto, xtea_should_run_enc_dec_key_128);
+    RUN_TEST_CASE(Crypto, xtea_should_run_enc_dec_key_192);
+    RUN_TEST_CASE(Crypto, xtea_should_run_enc_dec_key_256_plus);
+    // BLOWFISH
+    RUN_TEST_CASE(Crypto, blowfish_init_should_setup_ctx_128);
+    RUN_TEST_CASE(Crypto, blowfish_init_should_setup_ctx_192);
+    RUN_TEST_CASE(Crypto, blowfish_init_should_setup_ctx_256);
+    RUN_TEST_CASE(Crypto, blowfish_f_all);
+    RUN_TEST_CASE(Crypto, blowfish_enc_any);
+    RUN_TEST_CASE(Crypto, blowfish_enc_128_multiple);
+    RUN_TEST_CASE(Crypto, blowfish_enc_192_multiple);
+    RUN_TEST_CASE(Crypto, blowfish_enc_256_multiple);
+    RUN_TEST_CASE(Crypto, blowfish_enc_128);
+    RUN_TEST_CASE(Crypto, blowfish_enc_192);
+    RUN_TEST_CASE(Crypto, blowfish_enc_256);
+    RUN_TEST_CASE(Crypto, blowfish_dec_128);
+    RUN_TEST_CASE(Crypto, blowfish_dec_192);
+    RUN_TEST_CASE(Crypto, blowfish_dec_256);
+    RUN_TEST_CASE(Crypto, blowfish_128_should_enc);
+    RUN_TEST_CASE(Crypto, blowfish_192_should_enc);
+    RUN_TEST_CASE(Crypto, blowfish_256_should_enc);
+    RUN_TEST_CASE(Crypto, blowfish_128_should_dec);
+    RUN_TEST_CASE(Crypto, blowfish_192_should_dec);
+    RUN_TEST_CASE(Crypto, blowfish_256_should_dec);
+    RUN_TEST_CASE(Crypto, blowfish_128_should_enc_dec_key_128);
+    RUN_TEST_CASE(Crypto, blowfish_192_should_enc_dec_key_192);
+    RUN_TEST_CASE(Crypto, blowfish_256_should_enc_dec_key_256_plus);
+    // AES
+    RUN_TEST_CASE(Crypto, aes_getSBoxValue_128);
+    RUN_TEST_CASE(Crypto, aes_getSBoxValue_192);
+    RUN_TEST_CASE(Crypto, aes_getSBoxValue_256);
+    RUN_TEST_CASE(Crypto, aes_getSBoxInvert_128);
+    RUN_TEST_CASE(Crypto, aes_getSBoxInvert_192);
+    RUN_TEST_CASE(Crypto, aes_getSBoxInvert_256);
+    RUN_TEST_CASE(Crypto, aes_should_enc_128);
+    RUN_TEST_CASE(Crypto, aes_should_enc_192);
+    RUN_TEST_CASE(Crypto, aes_should_enc_256);
+    RUN_TEST_CASE(Crypto, aes_should_dec_128);
+    RUN_TEST_CASE(Crypto, aes_should_dec_192);
+    RUN_TEST_CASE(Crypto, aes_should_dec_256);
+    // CRYPT
+    RUN_TEST_CASE(Crypto, crypt_should_encrypt_XTEA);
+    RUN_TEST_CASE(Crypto, crypt_should_encrypt_AES_128);
+    RUN_TEST_CASE(Crypto, crypt_should_encrypt_AES_192);
+    RUN_TEST_CASE(Crypto, crypt_should_encrypt_AES_256);
+    RUN_TEST_CASE(Crypto, crypt_should_encrypt_BLOWFISH_128);
+    RUN_TEST_CASE(Crypto, crypt_should_encrypt_BLOWFISH_192);
+    RUN_TEST_CASE(Crypto, crypt_should_encrypt_BLOWFISH_256);
+    RUN_TEST_CASE(Crypto, crypt_should_not_encrypt_and_decrypt);
+    RUN_TEST_CASE(Crypto, aes_should_enc_dec_128_key_128);
+    RUN_TEST_CASE(Crypto, aes_should_enc_dec_192_key_192);
+    RUN_TEST_CASE(Crypto, aes_should_enc_dec_256_key_256_plus);
+}
